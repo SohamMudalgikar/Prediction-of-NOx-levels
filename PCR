@@ -1,0 +1,29 @@
+################################################################################
+#### PCR ####
+################################################################################
+#Splitting data into test and train#
+RNGkind(sample.kind = "Rounding")
+set.seed(123)
+x<-model.matrix(NOX~.,Train)[,-1]
+y<-Train$NOX
+x_test<-model.matrix(NOX~.,Test)
+
+
+pcr.fit<-pcr(NOX~.,data=Train, scale=TRUE, validation="CV")
+summary(pcr.fit)
+
+validationplot(pcr.fit,val.type="MSEP",newdata = Test)
+
+
+pcr.pred<-predict(pcr.fit,Test,ncomp = 20)
+MSE_pcr<-mean((pcr.pred-Test$NOX)^2)
+MSE_pcr
+pcr.fit<-pcr(y~x,scale=TRUE,ncomp=20)
+summary(pcr.fit)
+
+## Comparing PCR and Best OLS ##
+plot(pcr.pred,Test$NOX,col="red",pch=19)
+points(Second_Order_Model_2.predict,Test$NOX,col="green",lwd=2)
+abline(a=0,b=1)
+legend("topleft",legend=c("PCR", "Linear model"),
+       col=c("red","green"),pch=c(19,1),bty="n")
