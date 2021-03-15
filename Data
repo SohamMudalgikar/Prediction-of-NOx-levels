@@ -1,0 +1,100 @@
+############### Input Libraries  ###############################################
+require(ISLR)
+require(caret)
+require(dplyr)
+require(gbm)
+library(MASS)
+library(ggcorrplot)
+
+############### Loading data and Creating Train and Test sets ##################
+#### Read Data:
+nox_data=read.csv('~/nox.csv')
+str(nox_data)
+
+
+### Plotting scatterplot:
+par(mfrow=c(2,2))
+pairs(Train,pch=19)
+
+### Correlation between variables:
+Cor_train<-cor((Train))
+Cor_train
+
+ggcorrplot(Cor_train, hc.order = TRUE, type = "lower",
+           lab = TRUE,colors = c("#CCE5FF","#0080ff","#0066cc"))
+
+#### Attaching Centred for train and Test:
+attach(nox_data)
+AT_c<- AT-mean(AT)
+AP_c <- AP-mean(AP)
+AH_c <- AH-mean(AH)
+AFDP_c <- AFDP-mean(AFDP)
+GTEP_c <- GTEP-mean(GTEP)
+TIT_c <- TIT-mean(TIT)
+TAT_c <- TAT-mean(TAT)
+TEY_c <- TEY-mean(TEY)
+CDP_c <- CDP-mean(CDP)
+
+#### Data modified for including second order terms and interation terms:
+nox_data$AT_c.2<- AT_c^2
+nox_data$AP_c.2 <- AP_c^2
+nox_data$AH_c.2 <- AH_c^2
+nox_data$AFDP_c.2 <- AFDP_c^2
+nox_data$GTEP_c.2 <- GTEP_c^2
+nox_data$TIT_c.2 <- TIT_c^2
+nox_data$TAT_c.2 <- TAT_c^2
+nox_data$TEY_c.2 <- TEY_c^2
+nox_data$CDP_c.2 <- CDP_c^2
+
+nox_data$AT_c.AP_c<- AT_c*AP_c
+nox_data$AT_c.AH_c<-AT_c*AH_c
+nox_data$AT_c.AFDP_c<-AT_c*AFDP_c
+nox_data$AT_c.GTEP_c <-  AT_c*GTEP_c
+nox_data$AT_c.TIT_c <-   AT_c*TIT_c
+nox_data$AT_c.TIT_c  <-  AT_c*TIT_c
+nox_data$AT_c.TAT_c  <-  AT_c*TAT_c
+nox_data$AT_c.TEY_c <- AT_c*TEY_c 
+nox_data$AT_c.CDP_c  <-  AT_c*CDP_c
+
+nox_data$AP_c.AH_c<-AP_c*AH_c
+nox_data$AP_c.AFDP_c<-AP_c*AFDP_c
+nox_data$AP_c.GTEP_c<-AP_c*GTEP_c
+nox_data$AP_c.TIT_c<-AP_c*TIT_c
+nox_data$AP_c.TAT_c<-AP_c*TAT_c
+nox_data$AP_c.TEY_c<-AP_c*TEY_c
+nox_data$AP_c.CDP_c<-AP_c*CDP_c
+
+nox_data$AH_c.AFDP_c<- AH_c*AFDP_c
+nox_data$AH_c.GTEP_c<-AH_c*GTEP_c
+nox_data$AH_c.TIT_c<-AH_c*TIT_c
+nox_data$AH_c.TAT_c<-AH_c*TAT_c
+nox_data$AH_c.TEY_c<-AH_c*TEY_c
+nox_data$AH_c.CDP_c<-AH_c*CDP_c
+
+
+nox_data$AFDP_c.GTEP_c <-AFDP_c*GTEP_c
+nox_data$AFDP_c.TIT_c<-AFDP_c*TIT_c
+nox_data$AFDP_c.TAT_c <-AFDP_c*TAT_c
+nox_data$AFDP_c.TEY_c <-AFDP_c*TEY_c
+nox_data$AFDP_c.CDP_c <-AFDP_c*CDP_c
+
+nox_data$GTEP_c.TIT_c <-GTEP_c*TIT_c
+nox_data$GTEP_c.TAT_c <-GTEP_c*TAT_c
+nox_data$GTEP_c.TEY_c <-GTEP_c*TEY_c
+nox_data$GTEP_c.CDP_c <-GTEP_c*CDP_c
+
+nox_data$TIT_c.TAT_c <- TIT_c*TAT_c
+nox_data$TIT_c.TEY_c <- TIT_c*TEY_c
+nox_data$TIT_c.CDP_c <- TIT_c*CDP_c
+
+nox_data$TAT_c.TEY_c<-TAT_c*TEY_c
+nox_data$TAT_c.CDP_c<-TAT_c*CDP_c
+
+nox_data$TEY_c.CDP_c <- TEY_c*CDP_c
+
+#### Splitting data into training and test set:
+RNGkind(sample.kind = "Rounding")
+set.seed(123)
+Value<-sample(dim(nox_data)[1],dim(nox_data)[1]*0.8)
+Train<-nox_data[Value,]
+Test<-nox_data[-Value,]
