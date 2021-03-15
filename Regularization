@@ -1,0 +1,63 @@
+################################################################################
+#### Regularization #####
+################################################################################
+################################################################################
+#### Ridge Regression ####
+################################################################################
+x<-model.matrix(NOX~.,Train)
+y<-Train$NOX
+x_test<-model.matrix(NOX~.,Test)
+
+#Cross Validation for best Lambda#
+lam.grid <- 10^seq(1,-5,length=100)
+ridge.cv<- cv.glmnet(x[,-1],y,alpha=0,lambda=lam.grid)
+plot(ridge.cv)
+ridge.lam.best<- ridge.cv$lambda.min
+ridge.lam.best
+#Test MSE#
+ridge.fit<- glmnet(x[,-1],y, alpha=0,lambda=lam.grid)
+summary(ridge.fit)
+ridge.pred_train<- predict(ridge.fit, s=ridge.lam.best,x[,-1])
+SST<-sum((ridge.pred_train-mean(ridge.pred_train))^2)
+SSE<- sum((y-ridge.pred_train)^2)
+ridge.R2<- 1-SSE/SST
+ridge.pred<- predict(ridge.fit, s=ridge.lam.best,x_test[,-1])
+ridge.MSE<- mean((Test$NOX-ridge.pred)^2)
+ridge.MSE
+ridge.R2
+################################################################################
+## Comparing Ridge Regression and Best OLS ##
+plot(ridge.pred,Test$NOX,col="red",pch=19)
+points(Second_Order_Model_2.predict,Test$NOX,col="green",lwd=2)
+abline(a=0,b=1)
+legend("topleft",legend=c("Ridge Regression", "Linear model"),
+       col=c("red","green"),pch=c(19,1),bty="n")
+################################################################################
+
+################################################################################
+#### Lasso Regression #### 
+################################################################################
+
+lam.grid <- 10^seq(1,-5,length=100)
+Lasso.cv<- cv.glmnet(x[,-1],y,alpha=1,lambda=lam.grid)
+plot(Lasso.cv)
+Lasso.lam.best<- Lasso.cv$lambda.min
+Lasso.lam.best
+#Test MSE#
+Lasso.fit<- glmnet(x[,-1],y, alpha=1,lambda=lam.grid)
+Lasso.pred<- predict(Lasso.fit, s=0.2656,x_test[,-1])
+Lasso.MSE<- mean((Test$NOX-Lasso.pred)^2)
+Lasso.MSE
+Lasso.pred.train<-predict(Lasso.fit, s=0.2656,x[,-1])
+SST<-sum((Lasso.pred.train-mean(Lasso.pred.train))^2)
+SSE<- sum((y-Lasso.pred.train)^2)
+ridge.R2<- 1-SSE/SST
+ridge.R2
+################################################################################
+## Comparing Lasso Regression and Best OLS ##
+plot(Lasso.pred,Test$NOX,col="red",pch=19)
+points(Second_Order_Model_2.predict,Test$NOX,col="green",lwd=2)
+abline(a=0,b=1)
+legend("topleft",legend=c("Lasso Regression model", "Linear model"),
+       col=c("red","green"),pch=c(19,1),bty="n")
+################################################################################
