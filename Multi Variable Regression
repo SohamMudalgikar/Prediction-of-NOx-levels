@@ -1,0 +1,43 @@
+################################################################################
+#### Fit Complete Second Order Model ####
+################################################################################
+Second_Order_Model <- lm((NOX)~.,data=Train)
+par(mfrow=c(2,2))
+plot(Second_Order_Model)  
+summary(Second_Order_Model) 
+vif(Second_Order_Model)
+
+
+#### Second Order Model after removing insignificant Variables:
+
+Second_Order_Model_R2<- lm((NOX)~.-GTEP_c.2-TAT-TEY-AT_c.TEY_c-GTEP-AT_c.TAT_c-(CDP_c.2)-AP_c.CDP_c-AT_c.GTEP_c-AP_c.2-(AT_c.AP_c)-CDP-AFDP-AP_c.TEY_c-(TIT_c.CDP_c)-AFDP_c.TIT_c-AH_c.GTEP_c-AP_c.TAT_c-AP_c.TIT_c-TIT_c.2-AFDP_c.2-(AFDP_c.GTEP_c)-TEY_c.2-AT_c.AFDP_c-AH_c.2-TAT_c.TEY_c-TAT_c.CDP_c-TIT_c.TEY_c-GTEP_c.TAT_c-AFDP_c.CDP_c-AFDP_c.TEY_c-AFDP_c.TAT_c-(TEY_c.CDP_c) -GTEP_c.CDP_c-TAT_c.2-AT_c.AH_c-AT_c.CDP_c-AP_c.AH_c-AP_c.GTEP_c-AH_c.AFDP_c-AH_c.TIT_c-AH_c.TAT_c-AH_c.TEY_c-AH_c.CDP_c-GTEP_c.TIT_c,data=Train)
+par(mfrow=c(2,2))
+plot(Second_Order_Model_R2)  
+summary(Second_Order_Model_R2) 
+vif(Second_Order_Model_R2)
+
+## Test MSE:
+Second_Order_Model_R2.predict<- predict(Second_Order_Model_R2, newdata =Test)
+Second_Order_Model_R2.MSE<- mean((Test$NOX-Second_Order_Model_R2.predict)^2)
+Second_Order_Model_R2.MSE
+
+#### Complete Second Order model with combining correlated predictors:
+
+Second_Order_Model_2 <- lm((NOX)~AT+AP+AH+TAT+TEY+AT_c.2+AP_c.2+AH_c.2+AFDP_c.2+GTEP_c.2+TIT_c.2+TAT_c.2+AT_c.AFDP_c+TIT_c.TAT_c+AT_c.AP_c+AT_c.AH_c+AP_c.AH_c+AP_c.AFDP_c+AP_c.TAT_c+AH_c.TAT_c+AH_c.TEY_c,data=Train)
+par(mfrow=c(2,2))
+plot(Second_Order_Model_2)  
+summary(Second_Order_Model_2) 
+vif(Second_Order_Model_2)
+
+#### Reduced Second Order model with combining correlated predictors:
+#### Removing insignificant predictors:
+Second_Order_Model_2 <- lm((NOX)~AT+AP+AH+TEY+AT_c.2+AFDP_c.2+GTEP_c.2+AT_c.AFDP_c+TIT_c.TAT_c+AT_c.AH_c+AH_c.TAT_c,data=Train)
+par(mfrow=c(2,2))
+plot(Second_Order_Model_2)  
+summary(Second_Order_Model_2) 
+vif(Second_Order_Model_2)
+
+## Test MSE for fit.linear_bxcx##
+Second_Order_Model_2.predict<- predict(Second_Order_Model_2 , newdata =Test)
+Second_Order_Model_2.MSE<- mean((Test$NOX-Second_Order_Model_2.predict)^2)
+Second_Order_Model_2.MSE
