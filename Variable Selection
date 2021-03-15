@@ -1,0 +1,311 @@
+################################################################################
+#### Variable Selection #####
+################################################################################
+#### Creating data with combined correlated variables ####
+ind<-(c(nox_data$AP_c.2,nox_data$AH_c.2,nox_data$TAT_c.2,nox_data$AT_c.AP_c,nox_data$AP_c.AH_c,nox_data$AP_c.AFDP_c,nox_data$AP_c.TAT_c,nox_data$AH_c.TEY_c,   nox_data$TAT,nox_data$TIT_c.2,nox_data$NOX,nox_data$AT,nox_data$AP,nox_data$AH,nox_data$TEY,nox_data$AT_c.2,nox_data$AFDP_c.2,nox_data$GTEP_c.2,nox_data$AT_c.AFDP_c,nox_data$TIT_c.TAT_c,nox_data$AT_c.AH_c,nox_data$AH_c.TAT_c))
+nox_data.final<- matrix(ind,nrow=257)
+colnames(nox_data.final)<-c("AP_c.2","AH_c.2","TAT_c.2","AT_c.AP_c","AP_c.AH_c","AP_c.AFDP_c","AP_c.TAT_c","AH_c.TEY_c"    ,"TAT","TIT_c.2","NOX","AT","AP","AH","TEY","AT_c.2","AFDP_c.2","GTEP_c.2","AT_c.AFDP_c","TIT_c.TAT_c","AT_c.AH_c","AH_c.TAT_c")
+nox_data.final<-as.data.frame(nox_data.final)
+################################################################################
+##### Best subset selection and cross validation #####
+################################################################################
+##Splitting data into training and test set##
+RNGkind(sample.kind = "Rounding")
+set.seed(123)
+Value<-sample(dim(nox_data.final)[1],dim(nox_data.final)[1]*0.8)
+Train<-nox_data.final[Value,]
+Test<-nox_data.final[-Value,]
+################################################################################
+##Best subset selection##
+best.subset<-regsubsets(NOX~.,data=Train,nvmax=21,method = "exhaustive")
+best_summary<-summary(best.subset)
+best_summary
+
+##Calculating aic, bic & adj r2 from summary##
+names(best_summary)
+P=1:21
+aic<-best_summary$bic+2*P-log(dim(Train)[1])*P
+which.min(aic)
+aic
+
+which.min(best_summary$bic)
+best_summary$bic
+
+which.max(best_summary$adjr2)
+best_summary$adjr2
+
+##Plotting aic##
+par(mfrow=c(2,2), mar=c(4,4,4,4))
+plot(P,aic,pch=19,type="b",main="AIC")
+points(which.min(aic),aic[which.min(aic)],cex=1.5,col="red",lwd=2)
+abline(v=c(1:21),lty=3)
+
+##Plotting bic##
+
+plot(P,best_summary$bic,pch=19,type="b",main="BIC")
+points(which.min(best_summary$bic),best_summary$bic[which.min(best_summary$bic)],
+       cex=1.5,col="blue",lwd=2)
+abline(v=c(1:21),lty=3)
+
+##Plotting adjR2##
+
+plot(P,best_summary$adjr2,pch=19,type="b",main="AdjR2")
+points(which.max(best_summary$adjr2),best_summary$adjr2[which.max(best_summary$adjr2)],
+       cex=1.5,col="green",lwd=2)
+abline(v=c(1:21),lty=3)
+################################################################################
+##Prediction function to predict from best.subset##
+predict_subset<-function(obj,new,id){
+  form<-as.formula(obj$call[[2]])
+  mat<-model.matrix(form,new)
+  coefi<-coef(obj,id=id)
+  xvars<-names(coefi)
+  return(mat[,xvars]%*%coefi)
+}
+################################################################################
+##10 fold Cross Validation for train data##
+
+##Making an index to store values of folds##
+Folds.train<- sample(1:10,nrow(Train),replace = T)
+
+##Dummy matrix to store error estimates##
+CV.error.train<-matrix(NA,10,21,dimnames = list(NULL,paste(1:21)))
+
+## Performing 10 fold CV##
+for(j in 1:10){
+  best.subset<-regsubsets(NOX~.,data=Train[Folds.train!=j,],nvmax=21,method="exhaustive")
+  for(i in 1:21){
+    Pred.train<-predict_subset(best.subset,Train[Folds.train==j,],id=i)
+    CV.error.train[j,i]<-mean(((Train$NOX[Folds.train==j])-(Pred.train))^2)
+  }
+}
+
+##Calculate mean train MSE for each predictor and finding minimum train MSE##
+MSE.CV.train<-apply(CV.error.train,2,mean)
+MSE.CV.train
+min_MSE_Bst.train<-which.min(MSE.CV.train)
+
+## Plot and put a red circle around Lowest train MSE##
+par(mfrow=c(1,1))
+plot(1:21,MSE.CV.train,type="b",xlab = "Number of predictors",ylab="Estimated train MSE",
+     pch=19)
+points(min_MSE_Bst.train,MSE.CV.train[min_MSE_Bst.train],cex=2,col="red",lwd=2)
+abline(h=c(0,1e-4,2e-4,3e-4,4e-4),lty=2)
+################################################################################
+##Test MSE calculation###
+Pred.test<- predict_subset(best.subset, Test, id=9)
+MSE.CV.test<-mean((Test$NOX-Pred.test)^2)
+MSE.CV.test
+################################################################################
+## Comparing Best Subset and Best OLS ##
+plot(Pred.test,Test$NOX,col="red",pch=19)
+points(Second_Order_Model_2.predict,Test$NOX,col="green",lwd=2)
+abline(a=0,b=1)
+legend("topleft",legend=c("Best Subset", "Linear model"),
+       col=c("red","green"),pch=c(19,1),bty="n")
+################################################################################
+#### Forward Selection ####
+################################################################################
+
+Fwd.subset<-regsubsets (NOX~.,data= Train ,nvmax =21,method ="forward")
+Fwd.summary<-summary (Fwd.subset )
+Fwd.summary
+
+## Calculating aic, bic & adj r2 from summary##
+names(Fwd.summary)
+P=1:21
+aic<-Fwd.summary$bic+2*P-log(dim(Train)[1])*P
+aic
+which.min(aic)
+
+which.min(Fwd.summary$bic)
+Fwd.summary$bic
+
+which.max(Fwd.summary$adjr2)
+Fwd.summary$adjr2
+
+##Plotting aic##
+par(mfrow=c(2,2), mar=c(4,4,4,4))
+plot(P,aic,pch=19,type="b",main="AIC")
+points(which.min(aic),aic[which.min(aic)],cex=1.5,col="red",lwd=2)
+abline(v=c(1:21),lty=3)
+
+##Plotting bic##
+
+plot(P,Fwd.summary$bic,pch=19,type="b",main="BIC")
+points(which.min(Fwd.summary$bic),Fwd.summary$bic[which.min(Fwd.summary$bic)],
+       cex=1.5,col="blue",lwd=2)
+abline(v=c(1:21),lty=3)
+
+##Plotting adjR2##
+
+plot(P,Fwd.summary$adjr2,pch=19,type="b",main="AdjR2")
+points(which.max(Fwd.summary$adjr2),Fwd.summary$adjr2[which.max(Fwd.summary$adjr2)],
+       cex=1.5,col="green",lwd=2)
+abline(v=c(1:21),lty=3)
+
+################################################################################
+##Prediction function to predict from fwd.subset##
+predictfwd_subset<-function(obj,new,id){
+  form<-as.formula(obj$call[[2]])
+  mat<-model.matrix(form,new)
+  coefi<-coef(obj,id=id)
+  xvars<-names(coefi)
+  return(mat[,xvars]%*%coefi)
+}
+################################################################################
+################################################################################
+##10 fold Cross Validation for train data##
+
+##Making an index to store values of folds##
+Folds.train<- sample(1:10,nrow(Train),replace = T)
+
+##Dummy matrix to store error estimates##
+CV.error.train<-matrix(NA,10,21,dimnames = list(NULL,paste(1:21)))
+
+## Performing 10 fold CV##
+for(j in 1:10){
+  frwd.select<-regsubsets(NOX~.,data=Train[Folds.train!=j,],nvmax=21,method="forward")
+  for(i in 1:21){
+    Pred.train<-predict_subset(frwd.select,Train[Folds.train==j,],id=i)
+    CV.error.train[j,i]<-mean(((Train$NOX[Folds.train==j])-(Pred.train))^2)
+  }
+}
+
+##Calculate mean train MSE for each predictor and finding minimum train MSE##
+MSE.CV.train_fwd<-apply(CV.error.train,2,mean)
+MSE.CV.train_fwd
+min_MSE_Fwd<-which.min(MSE.CV.train_fwd)
+
+## Minimum MSE calculation###
+MSE.fwd<-rep(NA,21)
+for(i in 1:21) {
+  predict.fwd<- predictfwd_subset(Fwd.subset,Test, id=i)
+  MSE.fwd[i]<-mean((Test$NOX-predict.fwd)^2)
+}
+MSE.fwd
+min_FMSE<-which.min(MSE.fwd)
+MSE.fwd[min_FMSE]
+## Plot and put a red circle around Lowest test MSE##
+par(mfrow=c(1,1))
+plot(MSE.fwd, type="b", main="Test MSE FWD Selection", xlab="No. of Predictors",pch=19)
+points(min_FMSE,MSE.fwd[min_FMSE],cex=2,col="red",lwd=2)
+abline(h=c(0,1e-4,2e-4,3e-4,4e-4),lty=2)
+################################################################################
+## Comparing Forward Subset Selection and Best OLS ##
+plot(predict.fwd,Test$NOX,col="red",pch=19)
+points(Second_Order_Model_2.predict,Test$NOX,col="green",lwd=2)
+abline(a=0,b=1)
+legend("topleft",legend=c("Forward Subset Selection", "Linear model"),
+       col=c("red","green"),pch=c(19,1),bty="n")
+################################################################################
+
+################################################################################
+#### Backward Selection ####
+################################################################################
+
+Bwd.subset<-regsubsets (NOX~.,data= Train ,nvmax =21,method ="backward")
+Bwd.summary<-summary (Bwd.subset )
+Bwd.summary
+
+## Calculating aic, bic & adj r2 from summary##
+names(Bwd.summary)
+P=1:21
+aic<-Bwd.summary$bic+2*P-log(dim(Train)[1])*P
+aic
+which.min(aic)
+
+which.min(Bwd.summary$bic)
+Bwd.summary$bic
+
+which.max(Bwd.summary$adjr2)
+Bwd.summary$adjr2
+
+##Plotting aic##
+par(mfrow=c(2,2), mar=c(4,4,4,4))
+plot(P,aic,pch=19,type="b",main="AIC")
+points(which.min(aic),aic[which.min(aic)],cex=1.5,col="red",lwd=2)
+abline(v=c(1:21),lty=3)
+
+##Plotting bic##
+
+plot(P,Bwd.summary$bic,pch=19,type="b",main="BIC")
+points(which.min(Bwd.summary$bic),Bwd.summary$bic[which.min(Bwd.summary$bic)],
+       cex=1.5,col="blue",lwd=2)
+abline(v=c(1:21),lty=3)
+
+##Plotting adjR2##
+
+plot(P,Bwd.summary$adjr2,pch=19,type="b",main="AdjR2")
+points(which.max(Bwd.summary$adjr2),Bwd.summary$adjr2[which.max(Bwd.summary$adjr2)],
+       cex=1.5,col="green",lwd=2)
+abline(v=c(1:21),lty=3)
+
+################################################################################
+##Prediction function to predict from bwd.subset##
+predictbwd_subset<-function(obj,new,id){
+  form<-as.formula(obj$call[[2]])
+  mat<-model.matrix(form,new)
+  coefi<-coef(obj,id=id)
+  xvars<-names(coefi)
+  return(mat[,xvars]%*%coefi)
+}
+################################################################################
+##10 fold Cross Validation for train data##
+
+##Making an index to store values of folds##
+Folds.train<- sample(1:10,nrow(Train),replace = T)
+
+##Dummy matrix to store error estimates##
+CV.error.train<-matrix(NA,10,21,dimnames = list(NULL,paste(1:21)))
+
+## Performing 10 fold CV##
+for(j in 1:10){
+  bkwd.select<-regsubsets(NOX~.,data=Train[Folds.train!=j,],nvmax=21,method="backward")
+  for(i in 1:21){
+    Pred.train<-predict_subset(bkwd.select,Train[Folds.train==j,],id=i)
+    CV.error.train[j,i]<-mean(((Train$NOX[Folds.train==j])-(Pred.train))^2)
+  }
+}
+
+##Calculate mean train MSE for each predictor and finding minimum train MSE##
+MSE.CV.train_Bkwd<-apply(CV.error.train,2,mean)
+MSE.CV.train_Bkwd
+min_MSE_Bkwd<-which.min(MSE.CV.train_Bkwd)
+
+## Minimum MSE calculation###
+MSE.bwd<-rep(NA,21)
+for(i in 1:21) {
+  predict.bwd<- predictbwd_subset(Bwd.subset,Test, id=i)
+  MSE.bwd[i]<-mean((Test$NOX-predict.bwd)^2)
+}
+MSE.bwd
+min_BMSE<-which.min(MSE.bwd)
+MSE.bwd[min_BMSE]
+## Plot and put a red circle around Lowest test MSE##
+par(mfrow=c(1,1))
+plot(MSE.bwd, type="b", main="Test MSE BWD Selection", xlab="No. of Predictors",pch=19)
+points(min_BMSE,MSE.bwd[min_BMSE],cex=2,col="red",lwd=2)
+abline(h=c(0,1e-4,2e-4,3e-4,4e-4),lty=2)
+################################################################################
+## CV Error Plot for subset selection ##
+par(mfrow=c(1,1))
+plot(1:21,MSE.CV.train,type="b",xlab = "Number of predictors",ylab="Estimated train MSE",
+     pch=19,col="red")
+points(min_MSE_Bst.train,MSE.CV.train[min_MSE_Bst.train],cex=2,lwd=2)
+lines(1:21,MSE.CV.train_fwd,type="b",pch=19,col="green")
+points(min_MSE_Fwd,MSE.CV.train_fwd[min_MSE_Fwd],cex=2,lwd=2)
+lines(1:21,MSE.CV.train_Bkwd,type="b",pch=19,col="blue")
+points(min_MSE_Bkwd,MSE.CV.train_Bkwd[min_MSE_Bkwd],cex=2,lwd=2)
+abline(h=c(0,1e-4,2e-4,3e-4,4e-4),lty=2)
+title(main="CV Error Vs Number of Predictors")
+legend("topright",legend=c("Best Subset Selection","Forward Selection","Backward Selection"),col =c("red","green","blue"),
+       pch=19)
+################################################################################
+## Comparing Backward Subset and Best OLS ##
+plot(predict.bwd,Test$NOX,col="red",pch=19)
+points(Second_Order_Model_2.predict,Test$NOX,col="green",lwd=2)
+abline(a=0,b=1)
+legend("topleft",legend=c("Backward Subset Selection", "Linear model"),
+       col=c("red","green"),pch=c(19,1),bty="n")
+################################################################################
