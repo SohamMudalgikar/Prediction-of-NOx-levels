@@ -1,0 +1,185 @@
+################################################################################
+#### Data
+################################################################################
+#### Removing unwanted columns in best model ####
+ind<-(c(nox_data$AP_c.2,nox_data$AH_c.2,nox_data$TAT_c.2,nox_data$AT_c.AP_c,nox_data$AP_c.AH_c,nox_data$AP_c.AFDP_c,nox_data$AP_c.TAT_c,nox_data$AH_c.TEY_c,   nox_data$TAT,nox_data$TIT_c.2,nox_data$NOX,nox_data$AT,nox_data$AP,nox_data$AH,nox_data$TEY,nox_data$AT_c.2,nox_data$AFDP_c.2,nox_data$GTEP_c.2,nox_data$AT_c.AFDP_c,nox_data$TIT_c.TAT_c,nox_data$AT_c.AH_c,nox_data$AH_c.TAT_c))
+nox_data.final<- matrix(ind,nrow=257)
+colnames(nox_data.final)<-c("AP_c.2","AH_c.2","TAT_c.2","AT_c.AP_c","AP_c.AH_c","AP_c.AFDP_c","AP_c.TAT_c","AH_c.TEY_c"    ,"TAT","TIT_c.2","NOX","AT","AP","AH","TEY","AT_c.2","AFDP_c.2","GTEP_c.2","AT_c.AFDP_c","TIT_c.TAT_c","AT_c.AH_c","AH_c.TAT_c")
+nox_data.final<-as.data.frame(nox_data.final)
+nox_data_RT<-nox_data.final
+
+RNGkind(sample.kind = "Rounding")
+set.seed(123)
+Value = sample(dim(nox_data_RT)[1], dim(nox_data_RT)[1] *0.8)
+Train1 = nox_data_RT[Value, ]
+Test1 = nox_data_RT[-Value, ]
+################################################################################
+#####Growing tree
+################################################################################
+tree.mod <- rpart(NOX~.,method="anova", data=Train1,
+                  minsplit=2,maxsurrogate=0)
+
+# plot tree
+par(mfrow=c(1,1),mar=(rep(3,4)),cex=0.7)
+plot(tree.mod, uniform=T,main="Regression Tree for NOX")
+text(tree.mod)
+summary(tree.mod) # detailed summary of splits
+
+
+# display the cross-validation results
+printcp(tree.mod) 
+
+# visualize cross-validation results
+plotcp(tree.mod)
+
+# create additional plots
+par(mfrow=c(1,2)) # two plots on one page
+rsq.rpart(tree.mod) # visualize cross-validation results  
+
+#### Plot of MLR and Tree and Test MSE:
+pred.Tree=predict(tree.mod,newdata=Test1)
+Pred.Reg=predict(Second_Order_Model_2,newdata=Test)
+MSE.Tree=mean((Test1$NOX-pred.Tree)^2)
+MSE.Reg=mean((Test$NOX-Pred.Reg)^2)
+MSE.Tree
+MSE.Reg
+
+plot(Second_Order_Model_2.predict,Test$NOX,pch=19,col="blue")
+points(pred.Tree,Test1$NOX,col="red",lwd=2)
+abline(a=0,b=1)
+###############################################################################
+# prune the tree
+pfit=prune(tree.mod,
+           cp=tree.mod$cptable[which.min(tree.mod$cptable[,"xerror"]),
+                               "CP"])
+pfit=prune(tree.mod,
+           cp=tree.mod$cptable[3])
+
+# plot the pruned tree
+par(mfrow=c(1,1))
+plot(pfit, uniform=T,
+     main="Pruned Regression Tree for NOX")
+text(pfit)
+################################################################################     
+#### Bagging ####
+################################################################################
+
+#### bootstrap sample example:
+set.seed(123)
+boot.index=sample(1:dim(Train1)[1],dim(Train1)[1],replace=T)
+boot.index
+boot.sample=Train1[boot.index,]
+
+#### bagging:
+set.seed(123)
+bag.mod=randomForest(NOX~.,data=Train1,mtry=11,ntree=2000,importance=T)
+bag.mod
+plot(bag.mod)
+
+varImpPlot(bag.mod,type=1,pch=19)
+
+#### Plot of MLR and Bagging and Test MSE:
+pred.bag=predict(bag.mod,newdata=Test1)
+Pred.Reg=predict(Second_Order_Model_2,newdata=Test)
+MSE.bag=mean((Test1$NOX-pred.bag)^2)
+MSE.Reg=mean((Test$NOX-Pred.Reg)^2)
+MSE.bag
+MSE.Reg
+
+plot(Second_Order_Model_2.predict,Test$NOX,pch=19,col="blue")
+points(pred.bag,Test1$NOX,col="red",lwd=2)
+abline(a=0,b=1)
+
+################################################################################
+#### Random Forest ####
+################################################################################
+# tune model parameter mtry using caret
+control=trainControl(method="cv", number=5, search="grid")
+set.seed(123)
+tunegrid=expand.grid(mtry=c(1:21))
+rf_gridsearch=train(NOX~.,data=Train1, method="rf", metric="RMSE", 
+                    tuneGrid=tunegrid, trControl=control)
+ print(rf_gridsearch)
+plot(rf_gridsearch)
+
+set.seed(123)
+Random_Forest=randomForest(NOX~.,data=Train1,mtry=3, ntree=2000, 
+                    importance=T)
+Random_Forest
+plot(Random_Forest)
+
+varImpPlot(Random_Forest,type=1,pch=19)
+
+#### Plot of MLR and Random Forest and Test MSE:
+pred.Random_Forest=predict(Random_Forest,newdata=Test1)
+Pred.Reg=predict(Second_Order_Model_2,newdata=Test)
+MSE.Random_Forest=mean((Test1$NOX-pred.bag)^2)
+MSE.Reg=mean((Test$NOX-Pred.Reg)^2)
+MSE.Random_Forest
+MSE.Reg
+
+plot(Second_Order_Model_2.predict,Test$NOX,pch=19,col="blue")
+points(pred.Random_Forest,Test1$NOX,col="red",lwd=2)
+abline(a=0,b=1)
+
+
+################################################################################
+#### Gradient Boosting Method ####
+################################################################################
+#### Tune hyper-parameters using caret:
+control=trainControl(method="cv", number=5, search="grid")
+RNGkind(sample.kind = "Rounding")
+set.seed(123)
+tunegrid=expand.grid(n.trees=c(1000,1500,2000,2500,3000),
+                     interaction.depth=c(5,6,7,8,9),
+                     shrinkage=c(0.005,0.010,0.015,0.02),
+                     n.minobsinnode=c(1,2,3,4,5))
+
+gb_gridsearch=train(NOX~.,data=Train1, 
+                    method="gbm", metric="RMSE",
+                    tuneGrid=tunegrid, trControl=control)
+
+print(gb_gridsearch)
+plot(gb_gridsearch)
+
+#### Gradient Boosting Method
+RNGkind(sample.kind = "Rounding")
+set.seed(123)
+Gradient_Boosting_Method=gbm(NOX~.,data=Train1,
+                             distribution = "tdist",n.trees = 1450,
+                             shrinkage = 0.015, interaction.depth = 7, 
+                             n.minobsinnode=2)
+
+
+#### Plot of MLR and Gradient Boosting Method and Test MSE:
+Predict.Gradient_Boosting_Method=predict(Gradient_Boosting_Method,newdata=Test1)
+Pred.Reg=predict(Second_Order_Model_2,newdata=Test)
+MSE.GBM=mean((Test1$NOX-Predict.Gradient_Boosting_Method)^2)
+MSE.Reg=mean((Test$NOX-Pred.Reg)^2)
+MSE.GBM
+MSE.Reg
+
+plot(Second_Order_Model_2.predict,Test$NOX,pch=19,col="blue")
+points(Predict.Gradient_Boosting_Method,Test1$NOX,col="red",lwd=2)
+abline(a=0,b=1)
+
+Predict.Gradient_Boosting_Method_Train<-predict(Gradient_Boosting_Method,newdata=Train1)
+SST<-sum((Predict.Gradient_Boosting_Method_Train-mean(Predict.Gradient_Boosting_Method_Train))^2)
+SSE<- sum((Train1$NOX-Predict.Gradient_Boosting_Method_Train)^2)
+GBM.R2<- 1-SSE/SST
+GBM.R2
+Pruned Regression Tree for NOX")
+text(pfit)
+
+#### Plot of MLR and Tree and Test MSE:
+pred.prune.Tree=predict(pfit,newdata=Test1)
+Pred.Reg=predict(Second_Order_Model_2,newdata=Test)
+MSE.prune.Tree=mean((Test1$NOX-pred.prune.Tree)^2)
+MSE.Reg=mean((Test$NOX-Pred.Reg)^2)
+MSE.prune.Tree
+MSE.Reg
+
+plot(Second_Order_Model_2.predict,Test$NOX,pch=19,col="blue")
+points(pred.prune.Tree,Test1$NOX,col="red",lwd=2)
+abline(a=0,b=1)
+###############################################################################################
